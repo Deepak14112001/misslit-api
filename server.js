@@ -12,6 +12,12 @@ app.use(express.json());
 
 app.use("/uploads", express.static("uploads"));
 
+/* ROOT ROUTE */
+
+app.get("/", (req,res)=>{
+    res.send("MissLit API running 🚀");
+});
+
 /* SQL Server configuration */
 
 const config = {
@@ -26,12 +32,15 @@ const config = {
 
 /* Connect to SQL Server */
 
+let pool;
+
 sql.connect(config)
-.then(() => {
+.then((connection) => {
+    pool = connection;
     console.log("Connected to SQL Server");
 })
 .catch(err => {
-    console.log(err);
+    console.log("Database not connected:", err);
 });
 
 /* Multer configuration */
@@ -65,7 +74,7 @@ app.post("/participants", upload.single("photo"), async (req, res) => {
 
     try {
 
-        const request = new sql.Request();
+        const request = pool.request();
 
         await request.query(`
             INSERT INTO Participants (Name, DOB, Gender, PhotoPath)
@@ -89,7 +98,7 @@ app.get("/participants", async (req,res)=>{
 
     try{
 
-        const request = new sql.Request();
+        const request = pool.request();
 
         const result = await request.query(`
             SELECT * FROM Participants
