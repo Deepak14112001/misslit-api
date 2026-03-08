@@ -2,11 +2,18 @@ const express = require("express");
 const sql = require("mssql");
 const cors = require("cors");
 const multer = require("multer");
+const fs = require("fs");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+/* CREATE UPLOADS FOLDER IF NOT EXISTS */
+
+if (!fs.existsSync("uploads")) {
+    fs.mkdirSync("uploads");
+}
 
 /* Allow images to be accessed */
 
@@ -14,7 +21,7 @@ app.use("/uploads", express.static("uploads"));
 
 /* ROOT ROUTE */
 
-app.get("/", (req,res)=>{
+app.get("/", (req, res) => {
     res.send("MissLit API running 🚀");
 });
 
@@ -63,6 +70,10 @@ const upload = multer({ storage: storage });
 
 app.post("/participants", upload.single("photo"), async (req, res) => {
 
+    if (!pool) {
+        return res.status(500).send("Database not connected");
+    }
+
     console.log("BODY:", req.body);
     console.log("FILE:", req.file);
 
@@ -95,6 +106,10 @@ app.post("/participants", upload.single("photo"), async (req, res) => {
 /* GET PARTICIPANTS */
 
 app.get("/participants", async (req,res)=>{
+
+    if (!pool) {
+        return res.status(500).send("Database not connected");
+    }
 
     try{
 
