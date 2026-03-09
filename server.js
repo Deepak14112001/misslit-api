@@ -1,4 +1,5 @@
 require("dotenv").config();
+
 const express = require("express");
 const sql = require("mssql");
 const cors = require("cors");
@@ -7,9 +8,10 @@ const fs = require("fs");
 
 const app = express();
 
-/* Render PORT */
+/* PORT */
 const PORT = process.env.PORT || 3000;
 
+/* Middleware */
 app.use(cors());
 app.use(express.json());
 
@@ -18,7 +20,7 @@ if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
 
-/* Allow uploaded images access */
+/* Allow access to uploaded images */
 app.use("/uploads", express.static("uploads"));
 
 /* Root route */
@@ -37,9 +39,9 @@ const config = {
   }
 };
 
+/* SQL connection pool */
 let pool = null;
 
-/* Connect DB safely */
 async function connectDB() {
   try {
     pool = await sql.connect(config);
@@ -52,7 +54,7 @@ async function connectDB() {
 
 connectDB();
 
-/* Multer config */
+/* Multer configuration */
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "uploads/");
@@ -62,10 +64,20 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+/* Optional: Submission deadline */
+const endTime = new Date("2026-03-10T18:00:00");
 
 /* Insert participant */
 app.post("/participants", upload.single("photo"), async (req, res) => {
+
+  if (new Date() > endTime) {
+    return res.status(403).send("Submission closed");
+  }
 
   if (!pool) {
     return res.status(500).send("Database not connected");
@@ -77,14 +89,23 @@ app.post("/participants", upload.single("photo"), async (req, res) => {
   const photoPath = req.file ? req.file.filename : null;
 
   try {
+
     const request = pool.request();
+
+    request.input("name", sql.VarChar, name);
+    request.input("dob", sql.Date, dob);
+    request.input("gender", sql.VarChar, gender);
+    request.input("photo", sql.VarChar, photoPath);
 
     await request.query(`
       INSERT INTO Participants (Name, DOB, Gender, PhotoPath)
-      VALUES ('${name}', '${dob}', '${gender}', '${photoPath}')
+      VALUES (@name, @dob, @gender, @photo)
     `);
 
-    res.send("Participant saved successfully");
+    res.json({
+      success: true,
+      message: "Participant saved successfully"
+    });
 
   } catch (err) {
     console.log(err);
@@ -100,9 +121,15 @@ app.get("/participants", async (req, res) => {
   }
 
   try {
+
     const request = pool.request();
-    const result = await request.query(`SELECT * FROM Participants`);
+
+    const result = await request.query(`
+      SELECT * FROM Participants ORDER BY Id DESC
+    `);
+
     res.json(result.recordset);
+
   } catch (err) {
     console.log(err);
     res.status(500).send("Error retrieving participants");
