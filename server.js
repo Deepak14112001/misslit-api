@@ -6,134 +6,109 @@ const fs = require("fs");
 
 const app = express();
 
+/* Render PORT */
+const PORT = process.env.PORT || 3000;
+
 app.use(cors());
 app.use(express.json());
 
-/* CREATE UPLOADS FOLDER IF NOT EXISTS */
-
+/* Create uploads folder if not exists */
 if (!fs.existsSync("uploads")) {
-    fs.mkdirSync("uploads");
+  fs.mkdirSync("uploads");
 }
 
-/* Allow images to be accessed */
-
+/* Allow uploaded images access */
 app.use("/uploads", express.static("uploads"));
 
-/* ROOT ROUTE */
-
+/* Root route */
 app.get("/", (req, res) => {
-    res.send("MissLit API running 🚀");
+  res.send("MissLit API running 🚀");
 });
 
-/* SQL Server configuration */
-
+/* SQL Server config */
 const config = {
-    user: "misslituser",
-    password: "Deepak@123",
-    server: "localhost\\SQLEXPRESS",
-    database: "MissLitDB",
-    options: {
-        trustServerCertificate: true
-    }
+  user: "misslituser",
+  password: "Deepak@123",
+  server: "localhost\\SQLEXPRESS",
+  database: "MissLitDB",
+  options: {
+    trustServerCertificate: true
+  }
 };
 
-/* Connect to SQL Server */
+let pool = null;
 
-let pool;
-
-sql.connect(config)
-.then((connection) => {
-    pool = connection;
+/* Connect DB safely */
+async function connectDB() {
+  try {
+    pool = await sql.connect(config);
     console.log("Connected to SQL Server");
-})
-.catch(err => {
-    console.log("Database not connected:", err);
-});
+  } catch (err) {
+    console.log("Database connection failed");
+    console.log(err.message);
+  }
+}
 
-/* Multer configuration */
+connectDB();
 
+/* Multer config */
 const storage = multer.diskStorage({
-
-    destination: function(req, file, cb){
-        cb(null, "uploads/");
-    },
-
-    filename: function(req, file, cb){
-        cb(null, Date.now() + "-" + file.originalname);
-    }
-
+  destination: function (req, file, cb) {
+    cb(null, "uploads/");
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + "-" + file.originalname);
+  }
 });
 
 const upload = multer({ storage: storage });
 
-/* INSERT PARTICIPANT */
-
+/* Insert participant */
 app.post("/participants", upload.single("photo"), async (req, res) => {
 
-    if (!pool) {
-        return res.status(500).send("Database not connected");
-    }
+  if (!pool) {
+    return res.status(500).send("Database not connected");
+  }
 
-    console.log("BODY:", req.body);
-    console.log("FILE:", req.file);
+  const name = req.body.name;
+  const dob = req.body.dob;
+  const gender = req.body.gender;
+  const photoPath = req.file ? req.file.filename : null;
 
-    const name = req.body.name;
-    const dob = req.body.dob;
-    const gender = req.body.gender;
+  try {
+    const request = pool.request();
 
-    const photoPath = req.file ? req.file.filename : null;
+    await request.query(`
+      INSERT INTO Participants (Name, DOB, Gender, PhotoPath)
+      VALUES ('${name}', '${dob}', '${gender}', '${photoPath}')
+    `);
 
-    try {
+    res.send("Participant saved successfully");
 
-        const request = pool.request();
-
-        await request.query(`
-            INSERT INTO Participants (Name, DOB, Gender, PhotoPath)
-            VALUES ('${name}', '${dob}', '${gender}', '${photoPath}')
-        `);
-
-        res.send("Participant saved successfully");
-
-    } catch(err){
-
-        console.log(err);
-        res.status(500).send("Database error");
-
-    }
-
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Database error");
+  }
 });
 
-/* GET PARTICIPANTS */
+/* Get participants */
+app.get("/participants", async (req, res) => {
 
-app.get("/participants", async (req,res)=>{
+  if (!pool) {
+    return res.status(500).send("Database not connected");
+  }
 
-    if (!pool) {
-        return res.status(500).send("Database not connected");
-    }
-
-    try{
-
-        const request = pool.request();
-
-        const result = await request.query(`
-            SELECT * FROM Participants
-        `);
-
-        res.json(result.recordset);
-
-    }catch(err){
-
-        console.log(err);
-        res.status(500).send("Error retrieving participants");
-
-    }
-
+  try {
+    const request = pool.request();
+    const result = await request.query(`SELECT * FROM Participants`);
+    res.json(result.recordset);
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Error retrieving participants");
+  }
 });
 
-/* START SERVER */
-
-const PORT = process.env.PORT || 3000;
-
+/* Start server */
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
