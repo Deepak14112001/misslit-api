@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const sql = require("mssql");
 const cors = require("cors");
@@ -27,10 +28,10 @@ app.get("/", (req, res) => {
 
 /* SQL Server config */
 const config = {
-  user: "misslituser",
-  password: "Deepak@123",
-  server: "localhost\\SQLEXPRESS",
-  database: "MissLitDB",
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  server: process.env.DB_SERVER,
+  database: process.env.DB_NAME,
   options: {
     trustServerCertificate: true
   }
