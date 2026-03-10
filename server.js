@@ -75,7 +75,7 @@ const upload = multer({
 });
 
 /* Optional: Submission deadline */
-const endTime = new Date("2026-03-10T18:00:00");
+const endTime = new Date("2026-03-12T18:00:00");
 
 /* Insert participant */
 app.post("/participants", upload.single("photo"), async (req, res) => {
